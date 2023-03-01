@@ -1,0 +1,44 @@
+CREATE TABLE Users
+(
+    user_id       INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY, -- id пользователя
+    username      VARCHAR NOT NULL UNIQUE,                          -- логин
+    email         VARCHAR NOT NULL UNIQUE,                          -- электронная почта
+    user_role     VARCHAR NOT NULL,                                 -- роль: ROLE_USER
+    btc_balance   VARCHAR NOT NULL,                                 -- Баланс Биткоин-кошелька
+    ton_balance   VARCHAR NOT NULL,                                 -- Баланс Тонкоин-кошелька
+    rub_balance   VARCHAR NOT NULL,                                 -- Баланс Рублевого-кошелька
+    wallet_number VARCHAR NOT NULL UNIQUE                           -- уникальный ключ каждого пользователя для доступа к аккаунту
+);
+
+CREATE TABLE Operations
+(
+    operation_id   INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY, -- id операции
+    user_id        INTEGER REFERENCES Users (user_id),               -- id пользователя, которому принадлежит операция
+    created_at     TIMESTAMP NOT NULL,                               -- Дата и время совершения операции
+    operation_type VARCHAR   NOT NULL,                               -- Тип операции: пополнение кошелька в рублях, вывод валюты на кредитную карту (если выводятся рубли) или на адрес кошелька (если выводится криптовалюта), обменять какую-то валюту на другую валюту по установленному курсу
+    amount         VARCHAR   NOT NULL,                               -- Сумма, которую зачислили, вывели или обменяли
+    withdrawal_to  VARCHAR                                           -- Вывод валюты на: номер кредитной карты (если было снятие рублей) или адрес кошелька (если было снятие криптовалюты). Это поле будет пустым, если это не операция вывода суммы в какой-то валюте
+);
+
+CREATE TABLE Exchange_rates -- Курсы валют
+(
+    currency_id        INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY, -- id валюты
+    currency           VARCHAR(5) NOT NULL UNIQUE,                       -- Уникальное буквенное обозначение валюты (максимум 5 символов)
+    to_rub             VARCHAR    NOT NULL,                              -- Стоимость валютной единицы в рублях
+    to_btc             VARCHAR    NOT NULL,                              -- Стоимость валютной единицы в биткоинах
+    to_ton             VARCHAR    NOT NULL,                              -- Стоимость валютной единицы в тонкоинах
+    updated_at         TIMESTAMP  NOT NULL,                              -- Дата и время изменения курса валют
+    full_currency_name VARCHAR    NOT NULL UNIQUE                        -- Полное название валюты
+);
+
+-- Ниже представлено добавление одного администратора в таблицу Users для теста
+INSERT INTO Users(username, email, user_role, btc_balance, ton_balance, rub_balance, wallet_number)
+VALUES ('admin', 'admin@gmail.com', 'ROLE_ADMIN', 'null', 'null', 'null', '1071daaabf1cda35d207030c898d07ff16c934b7');
+
+-- Ниже представлено изначальное заполнение таблицы Exchange_rates для теста
+INSERT INTO Exchange_rates(currency, to_rub, to_btc, to_ton, updated_at, full_currency_name)
+VALUES ('RUB', 'null', 'null', 'null', LOCALTIMESTAMP, 'Russian ruble');
+INSERT INTO Exchange_rates(currency, to_rub, to_btc, to_ton, updated_at, full_currency_name)
+VALUES ('BTC', 'null', 'null', 'null', LOCALTIMESTAMP, 'Bitcoin');
+INSERT INTO Exchange_rates(currency, to_rub, to_btc, to_ton, updated_at, full_currency_name)
+VALUES ('TON', 'null', 'null', 'null', LOCALTIMESTAMP, 'Toncoin');
