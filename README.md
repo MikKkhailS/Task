@@ -1,25 +1,214 @@
-# Getting Started
+# Приложение для проведения торгов криптовалютами
 
-### Reference Documentation
-For further reference, please consider the following sections:
+---
 
-* [Official Apache Maven documentation](https://maven.apache.org/guides/index.html)
-* [Spring Boot Maven Plugin Reference Guide](https://docs.spring.io/spring-boot/docs/3.0.2/maven-plugin/reference/html/)
-* [Create an OCI image](https://docs.spring.io/spring-boot/docs/3.0.2/maven-plugin/reference/html/#build-image)
-* [Spring Web](https://docs.spring.io/spring-boot/docs/3.0.2/reference/htmlsingle/#web)
-* [Spring Security](https://docs.spring.io/spring-boot/docs/3.0.2/reference/htmlsingle/#web.security)
-* [Spring Data JPA](https://docs.spring.io/spring-boot/docs/3.0.2/reference/htmlsingle/#data.sql.jpa-and-spring-data)
-* [Validation](https://docs.spring.io/spring-boot/docs/3.0.2/reference/htmlsingle/#io.validation)
+### Обзор
 
-### Guides
-The following guides illustrate how to use some features concretely:
+Приложение является RESTfull API service — биржей для проведения торгов криптовалютами
 
-* [Building a RESTful Web Service](https://spring.io/guides/gs/rest-service/)
-* [Serving Web Content with Spring MVC](https://spring.io/guides/gs/serving-web-content/)
-* [Building REST services with Spring](https://spring.io/guides/tutorials/rest/)
-* [Securing a Web Application](https://spring.io/guides/gs/securing-web/)
-* [Spring Boot and OAuth2](https://spring.io/guides/tutorials/spring-boot-oauth2/)
-* [Authenticating a User with LDAP](https://spring.io/guides/gs/authenticating-ldap/)
-* [Accessing Data with JPA](https://spring.io/guides/gs/accessing-data-jpa/)
-* [Validation](https://spring.io/guides/gs/validating-form-input/)
+---
 
+### Приложение реализует следующие операции (минимальные требования):
+
+#### 1) Для пользователя:
+* Регистрация нового пользователя по email и username с проверкой на их уникальность;
+* Просмотр баланса кошелька по секретному ключу;
+* Пополнение кошелька по секретному ключу;
+* Вывод денег с биржи по секретному ключу, номеру кредитной карты (для рублей) или адресу кошелька (для криптовалюты);
+* Просмотр актуальных курсов валют по секретному ключу (для пользователя и администратора).
+
+#### 2) Для администратора:
+
+* Просмотр актуальных курсов валют по секретному ключу (для пользователя и администратора).
+* Просмотр общей суммы на всех пользовательских счетах для указанной валюты.
+
+---
+
+### Приложение реализует дополнительные требования:
+
+* Подключить базу данных PostgreSQL для хранения данных о балансе пользовательских кошельков и истории
+  операций
+
+---
+
+### Использованные технологии:
+
+* Java 17
+* Spring Boot 2.6.14
+* Maven
+* Lombok
+* PostgreSQL
+* Spring Data JPA
+* Spring REST
+
+---
+
+### Реализация:
+
+#### Первоначально была создана база данных PostgreSQL с названием crypto_exchange, а затем необходимые таблицы.
+В корне проекта лежит файл 
+[application.properties.origin](https://github.com/MikKkhailS/Task/blob/main/src/main/resources/application.properties.origin),
+в котором находится конфигурация БД и
+файл [DatabaseCreating.txt](https://github.com/MikKkhailS/Task/blob/main/DatabaseCreating.txt), в котором находится 
+SQL-код для создания таблиц, используемых моделями.
+
+#### Краткое описание работы приложения:
+
+В приложении имеются контроллеры UserController и AdminController, на которые поступают запросы в формате JSON, 
+посредством обращения к методам этих контроллеров по URI. В этих методах принимается соответствующее запросу DTO и 
+конвертируется в модель User, то есть в объект класса User. Затем этот объект передаётся в сервис UserService или 
+AdminService (в зависимости от URI), где происходит обращение к БД через кастомные репозитории и выполнение требуемых 
+операций. Также проверяется доступ к тому или иному методу в зависимости от роли (ROLE_USER или ROLE_ADMIN).
+
+Каждый запрос от пользователя тщательно валидируется. Сначала валидация происходит сразу при получении соответствующего 
+DTO, а затем в сервисе когда нужны данные из БД для проверки, если это необходимо. Если валидация или проверка значения 
+не прошла, то выбрасывается соответствующее исключение со статусом ошибки и сообщением для пользователя, которые затем 
+отправляются в формате JSON в виде ответа на запрос. Для обработки исключений был реализован их глобальный обработчик
+[GlobalExceptionHandler](https://github.com/MikKkhailS/Task/blob/main/src/main/java/ru/relex/exception/GlobalExceptionHandler.java).
+
+---
+
+### Запросы и ответы:
+
+---
+
+#### Для пользователя:
+
+1. Регистрация нового пользователя.
+
+`POST /sign-up`
+
+`Пример запроса:
+{
+"username": "test",
+"email": "test@gmail.com"
+}`
+
+`Пример ответа:
+{
+"secret_key": "095d0ccc-6293-4fcf-ba89-0b08e6f36202"
+}`
+
+---
+
+2. Просмотр баланса кошелька.
+
+`GET /show-wallet-balance`
+
+`Пример запроса:
+{
+"secret_key": "095d0ccc-6293-4fcf-ba89-0b08e6f36202"
+}`
+
+`Пример ответа:
+{
+"RUB_wallet": "0",
+"BTC_wallet": "0.005",
+"TON_wallet": "0"
+}`
+
+---
+
+3. Пополнение кошелька.
+
+`POST /top-up-balance`
+
+`Пример запроса:
+{
+"secret_key": "095d0ccc-6293-4fcf-ba89-0b08e6f36202",
+"RUB_wallet": "100"
+}`
+
+`Пример ответа:
+{
+"RUB_wallet": "100"
+}`
+
+---
+
+4. Вывод денег с биржи на кредитную карту (для рублей) или на адрес кошелька (для криптовалюты).
+
+`POST /withdraw-currency`
+
+* `Пример запроса:
+{
+"secret_key": "095d0ccc-6293-4fcf-ba89-0b08e6f36202",
+"currency": "RUB",
+"count": "20",
+"credit_card": "1234 1234 1234 1234"
+}`
+
+`Пример ответа:
+{
+"RUB_wallet": "80"
+}`
+
+* `Пример запроса:
+{
+"secret_key": "095d0ccc-6293-4fcf-ba89-0b08e6f36202",
+"currency": "BTC",
+"count": "0.00035",
+"wallet": "sdjfshdgfdsjfgsdsfdsfsdf"
+}`
+
+`Пример ответа:
+{
+"BTC_wallet": "0.00465"
+}`
+
+---
+
+#### Для пользователя и администратора:
+
+1. Просмотр актуальных курсов валют.
+
+`GET /show-exchange-rate`
+
+* Пример запроса:
+
+`{
+"secret_key": "095d0ccc-6293-4fcf-ba89-0b08e6f36202",
+"currency": "BTC"
+}`
+
+Пример ответа:
+
+`{
+"TON": "null",
+"RUB": "null"
+}`
+
+* Пример запроса:
+
+`{
+"secret_key": "1071daaabf1cda35d207030c898d07ff16c934b7",
+"currency": "RUB"
+}`
+
+Пример ответа:
+
+`{
+"TON": "null",
+"BTC": "null"
+}`
+
+---
+
+#### Для администратора:
+
+2. Посмотреть общую сумму на всех пользовательских счетах для указанной валюты.
+
+`GET /admin/get-total-amount`
+
+Пример запроса:
+
+`{
+"secret_key": "1071daaabf1cda35d207030c898d07ff16c934b7",
+"currency": "RUB"
+}`
+
+Пример ответа:
+
+`{
+"RUB": "80"
+}`

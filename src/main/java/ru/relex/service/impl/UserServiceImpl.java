@@ -234,6 +234,9 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new WalletNotFoundException("Wallet with secret key «" +
                         user.getWalletNumber() + "» not found"));
 
+        if (!isAvailable(foundUser))
+            throw new AuthorisationException("No access");
+
         var result = new String[3];
         result[0] = user.getCurrency();
 
@@ -259,5 +262,9 @@ public class UserServiceImpl implements UserService {
         }
 
         return result;
+    }
+
+    private boolean isAvailable(User foundUser) {
+        return (foundUser.getRole().equals("ROLE_ADMIN") | foundUser.getRole().equals("ROLE_USER"));
     }
 }

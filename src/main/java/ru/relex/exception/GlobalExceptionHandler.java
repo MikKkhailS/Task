@@ -72,4 +72,10 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(new AppError(HttpStatus.BAD_REQUEST.value(),
                 e.getMessage()), HttpStatus.BAD_REQUEST);
     }
+
+    @ExceptionHandler
+    private ResponseEntity<HttpStatus> handleException(AuthorisationException e) {
+        log.error(e.getMessage(), e);
+        return new ResponseEntity<>(HttpStatus.FORBIDDEN);
+    }
 }
