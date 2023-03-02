@@ -1,6 +1,7 @@
 package ru.relex.service.impl;
 
 import ru.relex.exception.*;
+import ru.relex.model.ExchangeRate;
 import ru.relex.model.Operation;
 import ru.relex.model.User;
 import ru.relex.model.enums.OperationType;
@@ -62,17 +63,18 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public String[] getOverallBalance(User user) {
-        var foundUser = userRepository.findByWalletNumber(user.getWalletNumber());
-        if (foundUser.isPresent()) {
-            return new String[]{
-                    foundUser.get().getBtcBalance(),
-                    foundUser.get().getTonBalance(),
-                    foundUser.get().getRubBalance()
-            };
-        } else {
-            throw new WalletNotFoundException("Wallet with secret key «" +
-                    user.getWalletNumber() + "» not found");
-        }
+        var foundUser = userRepository.findByWalletNumber(user.getWalletNumber())
+                .orElseThrow(() -> new WalletNotFoundException("Wallet with secret key «" +
+                        user.getWalletNumber() + "» not found"));
+
+        if (!isAvailable(foundUser))
+            throw new AuthorisationException("No access");
+
+        return new String[]{
+                    foundUser.getBtcBalance(),
+                    foundUser.getTonBalance(),
+                    foundUser.getRubBalance()
+        };
     }
 
     @Transactional
@@ -81,6 +83,9 @@ public class UserServiceImpl implements UserService {
         var foundUser = userRepository.findByWalletNumber(user.getWalletNumber())
                 .orElseThrow(() -> new WalletNotFoundException("Wallet with secret key «" +
                         user.getWalletNumber() + "» not found"));
+
+        if (!isAvailable(foundUser))
+            throw new AuthorisationException("No access");
 
         var df = new DecimalFormat("#.##");
         double balance;
@@ -107,6 +112,9 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new WalletNotFoundException("Wallet with secret key «" +
                         user.getWalletNumber() + "» not found"));
 
+        if (!isAvailable(foundUser))
+            throw new AuthorisationException("No access");
+
         if (user.getWithdrawToCard() == null & user.getWithdrawToWallet() == null) {
             throw new WithdrawException("Field for withdrawing the amount " +
                     "in some currency must be filled");
@@ -123,8 +131,7 @@ public class UserServiceImpl implements UserService {
                                 "Don't forget the spaces");
                     }
 
-                    if (user.getAmount().matches(
-                            "(([1-9]\\d{1,5})\\.((0[1-9])|([1-9]\\d?)))|" +
+                    if (user.getAmount().matches("(([1-9]\\d{1,5})\\.((0[1-9])|([1-9]\\d?)))|" +
                                     "([1-9]\\d{1,5}(\\.0{1,2})?)")) {
                         operation.setOperationType(OperationType.WITHDRAW_RUB_TO_CREDIT_CARD.toString());
                         user.setRubBalance(user.getAmount());
@@ -139,8 +146,7 @@ public class UserServiceImpl implements UserService {
             }
             case "TON" -> {
                 if (user.getAmount() != null & user.getWithdrawToWallet() != null) {
-                    if (user.getAmount().matches(
-                            "((0|([1-9][0-9]{0,5}))\\.((0\\d{0,6}[1-9])|([1-9]\\d{0,7})))|" +
+                    if (user.getAmount().matches("((0|([1-9][0-9]{0,5}))\\.((0\\d{0,6}[1-9])|([1-9]\\d{0,7})))|" +
                                     "([1-9]\\d{0,5}(\\.0{1,8})?)")) {
                         operation.setOperationType(OperationType.WITHDRAW_TON_TO_WALLET.toString());
                         user.setTonBalance(user.getAmount());
@@ -155,8 +161,7 @@ public class UserServiceImpl implements UserService {
             }
             case "BTC" -> {
                 if (user.getAmount() != null & user.getWithdrawToWallet() != null) {
-                    if (user.getAmount().matches(
-                            "((0|([1-9][0-9]{0,5}))\\.((0\\d{0,6}[1-9])|([1-9]\\d{0,7})))|" +
+                    if (user.getAmount().matches("((0|([1-9][0-9]{0,5}))\\.((0\\d{0,6}[1-9])|([1-9]\\d{0,7})))|" +
                                     "([1-9]\\d{0,5}(\\.0{1,8})?)")) {
                         operation.setOperationType(OperationType.WITHDRAW_BTC_TO_WALLET.toString());
                         user.setBtcBalance(user.getAmount());
@@ -234,9 +239,6 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new WalletNotFoundException("Wallet with secret key «" +
                         user.getWalletNumber() + "» not found"));
 
-        if (!isAvailable(foundUser))
-            throw new AuthorisationException("No access");
-
         var result = new String[3];
         result[0] = user.getCurrency();
 
@@ -264,7 +266,156 @@ public class UserServiceImpl implements UserService {
         return result;
     }
 
+    @Transactional
+    @Override
+    public String[] exchangeCurrency(User user) {
+        var foundUser = userRepository.findByWalletNumber(user.getWalletNumber())
+                .orElseThrow(() -> new WalletNotFoundException("Wallet with secret key «" +
+                        user.getWalletNumber() + "» not found"));
+
+        if (!isAvailable(foundUser))
+            throw new AuthorisationException("No access");
+
+        var result = new String[4];
+        result[0] = user.getCurrency();
+        result[2] = user.getAmount();
+
+        DecimalFormat df;
+        double balance;
+        var amount = Double.parseDouble(user.getAmount());
+        Operation operation = new Operation();
+
+        switch (user.getCurrency()) {
+            case "RUB" -> {
+                if (!user.getCurrencyTo().equals("TON") & !user.getCurrencyTo().equals("BTC"))
+                    throw new ExchangeRateException("Currency exchange error");
+
+                if (!user.getAmount().matches(
+                        "((0|([1-9][0-9]{0,11}))\\.((0\\d{0,6}[1-9])|([1-9]\\d{0,7})))|" +
+                                "([1-9]\\d{0,11}(\\.0{1,8})?)")) {
+                    throw new AmountException("Incorrect value. You can exchange a minimum: 0.00000001 RUB " +
+                            "and a maximum: 999999999999.99999999 RUB");
+                }
+
+                balance = Double.parseDouble(foundUser.getRubBalance());
+
+                if (balance < amount) {
+                    throw new AmountException("Error. There are not enough funds on the balance");
+                }
+
+                ExchangeRate exchangeRate = exchangeRateRepository.findByCurrency("RUB").get();
+
+                balance -= amount;
+                switch (user.getCurrencyTo()) {
+                    case "TON" -> {
+                        amount *= Double.parseDouble(exchangeRate.getToTon());
+                        df = new DecimalFormat("#.########");
+                        foundUser.setRubBalance(df.format(balance).replaceAll(",", "."));
+                        foundUser.setTonBalance(df.format(amount).replaceAll(",", "."));
+                        operation.setOperationType(OperationType.EXCHANGE_RUB_TO_TON.toString());
+                        result[3] = foundUser.getTonBalance();
+                    }
+                    case "BTC" -> {
+                        amount *= Double.parseDouble(exchangeRate.getToBtc());
+                        df = new DecimalFormat("#.########");
+                        foundUser.setRubBalance(df.format(balance).replaceAll(",", "."));
+                        foundUser.setBtcBalance(df.format(amount).replaceAll(",", "."));
+                        operation.setOperationType(OperationType.EXCHANGE_RUB_TO_BTC.toString());
+                        result[3] = foundUser.getBtcBalance();
+                    }
+                }
+            }
+            case "TON" -> {
+                if (!user.getCurrencyTo().equals("BTC") & !user.getCurrencyTo().equals("RUB"))
+                    throw new ExchangeRateException("Currency exchange error");
+
+                if (!user.getAmount().matches(
+                        "((0|([1-9][0-9]{0,11}))\\.((0\\d{0,6}[1-9])|([1-9]\\d{0,7})))|" +
+                                "([1-9]\\d{0,11}(\\.0{1,8})?)")) {
+                    throw new AmountException("Incorrect value. You can exchange a minimum: 0.00000001 TON " +
+                            "and a maximum: 999999999999.99999999 TON");
+                }
+
+                balance = Double.parseDouble(foundUser.getTonBalance());
+
+                if (balance < amount) {
+                    throw new AmountException("Error. There are not enough funds on the balance");
+                }
+
+                ExchangeRate exchangeRate = exchangeRateRepository.findByCurrency("TON").get();
+
+                balance -= amount;
+                switch (user.getCurrencyTo()) {
+                    case "BTC" -> {
+                        amount *= Double.parseDouble(exchangeRate.getToBtc());
+                        df = new DecimalFormat("#.########");
+                        foundUser.setTonBalance(df.format(balance).replaceAll(",", "."));
+                        foundUser.setBtcBalance(df.format(amount).replaceAll(",", "."));
+                        operation.setOperationType(OperationType.EXCHANGE_TON_TO_BTC.toString());
+                        result[3] = foundUser.getBtcBalance();
+                    }
+                    case "RUB" -> {
+                        amount *= Double.parseDouble(exchangeRate.getToRub());
+                        df = new DecimalFormat("#.########");
+                        foundUser.setTonBalance(df.format(balance).replaceAll(",", "."));
+                        foundUser.setRubBalance(df.format(amount).replaceAll(",", "."));
+                        operation.setOperationType(OperationType.EXCHANGE_TON_TO_RUB.toString());
+                        result[3] = foundUser.getRubBalance();
+                    }
+                }
+            }
+            case "BTC" -> {
+                if (!user.getCurrencyTo().equals("TON") & !user.getCurrencyTo().equals("RUB"))
+                    throw new ExchangeRateException("Currency exchange error");
+
+                if (!user.getAmount().matches(
+                        "((0|([1-9][0-9]{0,11}))\\.((0\\d{0,6}[1-9])|([1-9]\\d{0,7})))|" +
+                                "([1-9]\\d{0,11}(\\.0{1,8})?)")) {
+                    throw new AmountException("Incorrect value. You can exchange a minimum: 0.00000001 BTC " +
+                            "and a maximum: 999999999999.99999999 BTC");
+                }
+
+                balance = Double.parseDouble(foundUser.getBtcBalance());
+
+                if (balance < amount) {
+                    throw new AmountException("Error. There are not enough funds on the balance");
+                }
+
+                ExchangeRate exchangeRate = exchangeRateRepository.findByCurrency("BTC").get();
+
+                balance -= amount;
+                switch (user.getCurrencyTo()) {
+                    case "TON" -> {
+                        amount *= Double.parseDouble(exchangeRate.getToTon());
+                        df = new DecimalFormat("#.########");
+                        foundUser.setBtcBalance(df.format(balance).replaceAll(",", "."));
+                        foundUser.setTonBalance(df.format(amount).replaceAll(",", "."));
+                        operation.setOperationType(OperationType.EXCHANGE_BTC_TO_TON.toString());
+                        result[3] = foundUser.getTonBalance();
+                    }
+                    case "RUB" -> {
+                        amount *= Double.parseDouble(exchangeRate.getToRub());
+                        df = new DecimalFormat("#.########");
+                        foundUser.setBtcBalance(df.format(balance).replaceAll(",", "."));
+                        foundUser.setRubBalance(df.format(amount).replaceAll(",", "."));
+                        operation.setOperationType(OperationType.EXCHANGE_BTC_TO_RUB.toString());
+                        result[3] = foundUser.getBtcBalance();
+                    }
+                }
+            }
+        }
+
+        operation.setCreatedAt(new Date());
+        operation.setAmount(user.getAmount());
+
+        foundUser.addOperation(operation);
+        operationRepository.save(operation);
+
+        result[1] = user.getCurrencyTo();
+        return result;
+    }
+
     private boolean isAvailable(User foundUser) {
-        return (foundUser.getRole().equals("ROLE_ADMIN") | foundUser.getRole().equals("ROLE_USER"));
+        return (foundUser.getRole().equals("ROLE_USER"));
     }
 }

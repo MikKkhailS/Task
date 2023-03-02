@@ -39,7 +39,7 @@ public class UserController {
 
     @GetMapping("/show-wallet-balance")
     public ResponseEntity<?> getOverallBalance(@RequestBody @Valid OverallBalanceDTO dto) {
-        var result = userService.getOverallBalance(convertToUser(dto));
+        String[] result = userService.getOverallBalance(convertToUser(dto));
         response = Map.of(
                 "BTC_wallet", result[0],
                 "TON_wallet", result[1],
@@ -59,7 +59,7 @@ public class UserController {
 
     @PostMapping("/withdraw-currency")
     public ResponseEntity<?> withdrawCurrency(@RequestBody @Valid WithdrawCurrencyDTO dto) {
-        var result = userService.withdrawCurrency(convertToUser(dto));
+        String[] result = userService.withdrawCurrency(convertToUser(dto));
         switch (result[0]) {
             case "BTC" -> response = Collections.singletonMap("BTC_wallet", result[1]);
             case "TON" -> response = Collections.singletonMap("TON_wallet", result[1]);
@@ -71,12 +71,25 @@ public class UserController {
 
     @GetMapping("/show-exchange-rate")
     public ResponseEntity<?> showExchangeRate(@RequestBody @Valid ShowExchangeRateDTO dto) {
-        var result = userService.showExchangeRate(convertToUser(dto));
+        String[] result = userService.showExchangeRate(convertToUser(dto));
         switch (result[0]) {
             case "BTC" -> response = Map.of("TON", result[1], "RUB", result[2]);
             case "TON" -> response = Map.of("BTC", result[1], "RUB", result[2]);
             case "RUB" -> response = Map.of("BTC", result[1], "TON", result[2]);
         }
+
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @PostMapping("/exchange-currency")
+    public ResponseEntity<?> exchangeCurrency(@RequestBody @Valid ExchangeCurrencyDTO dto) {
+        String[] result = userService.exchangeCurrency(convertToUser(dto));
+        response = Map.of(
+                    "currency_from", result[0],
+                    "currency_to", result[1],
+                    "amount_from", result[2],
+                    "amount_to", result[3]
+        );
 
         return new ResponseEntity<>(response, HttpStatus.OK);
     }

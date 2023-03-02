@@ -57,4 +57,13 @@ public class User {
 
     @Transient
     private String amount;
+
+    @Transient
+    private String dateFrom;
+
+    @Transient
+    private String dateTo;
+
+    @Transient
+    private String currencyTo;
 }

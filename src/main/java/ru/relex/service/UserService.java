@@ -8,4 +8,5 @@ public interface UserService {
     String topUpBalance(User user);
     String[] withdrawCurrency(User user);
     String[] showExchangeRate(User user);
+    String[] exchangeCurrency(User user);
 }
