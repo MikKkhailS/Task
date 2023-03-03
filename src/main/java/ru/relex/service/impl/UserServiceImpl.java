@@ -287,7 +287,7 @@ public class UserServiceImpl implements UserService {
 
         switch (user.getCurrency()) {
             case "RUB" -> {
-                if (!user.getCurrencyTo().equals("TON") & !user.getCurrencyTo().equals("BTC"))
+                if (!user.getCurrTo().equals("TON") & !user.getCurrTo().equals("BTC"))
                     throw new ExchangeRateException("Currency exchange error");
 
                 if (!user.getAmount().matches(
@@ -306,7 +306,7 @@ public class UserServiceImpl implements UserService {
                 ExchangeRate exchangeRate = exchangeRateRepository.findByCurrency("RUB").get();
 
                 balance -= amount;
-                switch (user.getCurrencyTo()) {
+                switch (user.getCurrTo()) {
                     case "TON" -> {
                         amount *= Double.parseDouble(exchangeRate.getToTon());
                         df = new DecimalFormat("#.########");
@@ -326,7 +326,7 @@ public class UserServiceImpl implements UserService {
                 }
             }
             case "TON" -> {
-                if (!user.getCurrencyTo().equals("BTC") & !user.getCurrencyTo().equals("RUB"))
+                if (!user.getCurrTo().equals("BTC") & !user.getCurrTo().equals("RUB"))
                     throw new ExchangeRateException("Currency exchange error");
 
                 if (!user.getAmount().matches(
@@ -345,7 +345,7 @@ public class UserServiceImpl implements UserService {
                 ExchangeRate exchangeRate = exchangeRateRepository.findByCurrency("TON").get();
 
                 balance -= amount;
-                switch (user.getCurrencyTo()) {
+                switch (user.getCurrTo()) {
                     case "BTC" -> {
                         amount *= Double.parseDouble(exchangeRate.getToBtc());
                         df = new DecimalFormat("#.########");
@@ -365,7 +365,7 @@ public class UserServiceImpl implements UserService {
                 }
             }
             case "BTC" -> {
-                if (!user.getCurrencyTo().equals("TON") & !user.getCurrencyTo().equals("RUB"))
+                if (!user.getCurrTo().equals("TON") & !user.getCurrTo().equals("RUB"))
                     throw new ExchangeRateException("Currency exchange error");
 
                 if (!user.getAmount().matches(
@@ -384,7 +384,7 @@ public class UserServiceImpl implements UserService {
                 ExchangeRate exchangeRate = exchangeRateRepository.findByCurrency("BTC").get();
 
                 balance -= amount;
-                switch (user.getCurrencyTo()) {
+                switch (user.getCurrTo()) {
                     case "TON" -> {
                         amount *= Double.parseDouble(exchangeRate.getToTon());
                         df = new DecimalFormat("#.########");
@@ -411,7 +411,7 @@ public class UserServiceImpl implements UserService {
         foundUser.addOperation(operation);
         operationRepository.save(operation);
 
-        result[1] = user.getCurrencyTo();
+        result[1] = user.getCurrTo();
         return result;
     }
 

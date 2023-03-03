@@ -65,5 +65,5 @@ public class User {
     private String dateTo;
 
     @Transient
-    private String currencyTo;
+    private String currTo;
 }

@@ -28,7 +28,7 @@ public class ExchangeCurrencyDTO {
     @Pattern(regexp = "(RUB|TON|BTC)", message = "Invalid currency_to name. " +
             "Possible values: «RUB», «TON», «BTC»")
     @JsonProperty(value = "currency_to")
-    private String currencyTo;
+    private String currTo;
 
     @NotEmpty(message = "Field «amount» should be filled")
     @JsonProperty(value = "amount")
